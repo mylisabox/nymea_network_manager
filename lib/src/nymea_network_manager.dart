@@ -66,7 +66,7 @@ class NymeaNetworkManager {
     }
   }
 
-  /// Returns a list of available networks on the remote device
+  /// Returns a list of [WiFiNetwork] available networks on the remote device
   Future<List<WiFiNetwork>> getNetworks() async {
     await scanNetwork();
     final command = 0;
