@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+  MyHomePage({Key? key, required this.title}) : super(key: key);
 
   final String title;
 
@@ -122,13 +122,13 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-Future<String> showPrompt(
+Future<String?> showPrompt(
   BuildContext context, {
-  String title,
-  String label,
-  String hint,
+  required String title,
+  String? label,
+  String? hint,
 }) {
-  return showDialog(
+  return showDialog<String>(
     context: context,
     builder: (context) => HookBuilder(
       builder: (context) {

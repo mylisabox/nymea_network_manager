@@ -3,6 +3,7 @@ library nymea_network_manager;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:collection/collection.dart' show IterableExtension;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 
@@ -12,7 +13,7 @@ class WiFiNetwork {
   final int signalStrength;
   final bool isOpen;
 
-  WiFiNetwork({this.ssid, this.macAddress, this.signalStrength, this.isOpen});
+  WiFiNetwork({required this.ssid, required this.macAddress, this.signalStrength = 0, this.isOpen = true});
 
   @override
   String toString() {
@@ -27,7 +28,7 @@ class ConnectionInfo {
   final bool isOpen;
   final int signalStrength;
 
-  ConnectionInfo({this.ip, this.name, this.macAddress, this.isOpen, this.signalStrength});
+  ConnectionInfo({required this.ip, required this.name, required this.macAddress, this.isOpen = true, this.signalStrength = 0});
 
   @override
   String toString() {
@@ -48,17 +49,17 @@ class NymeaNetworkManager {
   final bool enableLogs;
   FlutterBlue _blue = FlutterBlue.instance;
   List<BluetoothService> _services = [];
-  BluetoothDevice _connectedDevice;
+  BluetoothDevice? _connectedDevice;
 
   NymeaNetworkManager({this.advertisingName = 'BT WLAN setup', this.enableLogs = false});
 
-  BluetoothService get _wifiService => _services.firstWhere((element) => element.uuid.toString() == _serviceWiFiCommander, orElse: () => null);
+  BluetoothService? get _wifiService => _services.firstWhereOrNull((element) => element.uuid.toString() == _serviceWiFiCommander);
 
-  BluetoothCharacteristic get _wifiRequest =>
-      _wifiService?.characteristics?.firstWhere((element) => element.uuid.toString() == _characterisitcCommanderRequest, orElse: () => null);
+  BluetoothCharacteristic? get _wifiRequest =>
+      _wifiService?.characteristics.firstWhereOrNull((element) => element.uuid.toString() == _characterisitcCommanderRequest);
 
-  BluetoothCharacteristic get _wifiResponse =>
-      _wifiService?.characteristics?.firstWhere((element) => element.uuid.toString() == _characterisitcCommanderResult, orElse: () => null);
+  BluetoothCharacteristic? get _wifiResponse =>
+      _wifiService?.characteristics.firstWhereOrNull((element) => element.uuid.toString() == _characterisitcCommanderResult);
 
   void _log(String message) {
     if (enableLogs) {
@@ -86,9 +87,12 @@ class NymeaNetworkManager {
     return _write('{"c":$command,"p":{"e":"$ssid","p":"$password"}}', _wifiRequest, _wifiResponse, command: command);
   }
 
-  Future<dynamic> _write(String data, BluetoothCharacteristic characteristicRequest, BluetoothCharacteristic characteristicResponse, {int command}) async {
-    StreamSubscription subscription;
+  Future<dynamic> _write(String data, BluetoothCharacteristic? characteristicRequest, BluetoothCharacteristic? characteristicResponse, {int? command}) async {
+    late StreamSubscription subscription;
     Completer completer = Completer();
+    if (characteristicResponse == null) {
+      return Future.error(StateError('no characteristicResponse'));
+    }
 
     var completeData = '';
     subscription = characteristicResponse.value.listen((element) {
@@ -119,7 +123,7 @@ class NymeaNetworkManager {
       final endIndex = i == packets - 1 ? rawData.length : i * 20 + 20;
       final part = rawData.sublist(i * 20, endIndex);
       _log('Write part of $i/$packets: ' + String.fromCharCodes(part));
-      await characteristicRequest.write(part);
+      await characteristicRequest!.write(part);
     }
 
     return completer.future;
@@ -152,24 +156,24 @@ class NymeaNetworkManager {
     );
   }
 
-  Future<void> disconnect() {
-    return _connectedDevice?.disconnect();
+  Future<void> disconnect() async {
+    await _connectedDevice?.disconnect();
   }
 
   Future<bool> connect() async {
     final completer = Completer<bool>();
-    StreamSubscription subscription;
+    late StreamSubscription subscription;
 
     final connectedDevices = await _blue.connectedDevices;
     _log('already connected devices $connectedDevices');
 
-    final device = connectedDevices.firstWhere((element) => element.name == advertisingName, orElse: () => null);
+    final device = connectedDevices.firstWhereOrNull((element) => element.name == advertisingName);
     bool deviceFound = false;
     if (device == null) {
       // Listen to scan results
       subscription = _blue.scanResults.listen((results) async {
         _log('scan results $results');
-        final wantedDevice = results.firstWhere((element) => element.device.name == advertisingName, orElse: () => null);
+        final wantedDevice = results.firstWhereOrNull((element) => element.device.name == advertisingName);
         _log('wantedDevice $wantedDevice');
         if (wantedDevice != null) {
           deviceFound = true;
@@ -179,7 +183,7 @@ class NymeaNetworkManager {
             subscription.cancel();
             await wantedDevice.device.connect(autoConnect: false, timeout: Duration(seconds: 4));
             _services = await wantedDevice.device.discoverServices();
-            await _wifiResponse.setNotifyValue(true);
+            await _wifiResponse?.setNotifyValue(true);
             if (completer.isCompleted) {
               _log('search already completed, ignored connected device');
             } else {
@@ -212,13 +216,13 @@ class NymeaNetworkManager {
         completer.completeError(NoDeviceException());
       }
     } else {
-      final state = await device.state.firstWhere((element) => element == BluetoothDeviceState.connected, orElse: () => null);
-      if (state == null) {
+      final state = await device.state.firstWhere((element) => element == BluetoothDeviceState.connected, orElse: (() => BluetoothDeviceState.disconnected));
+      if (state == BluetoothDeviceState.disconnected) {
         await device.connect(autoConnect: false, timeout: Duration(seconds: 4));
       }
 
       _services = await device.discoverServices();
-      await _wifiResponse.setNotifyValue(true);
+      await _wifiResponse?.setNotifyValue(true);
       completer.complete(true);
     }
     return completer.future;
@@ -234,7 +238,7 @@ class NoDeviceException implements Exception {
 }
 
 class NetworkManagerException implements Exception {
-  final Map<String, dynamic> rawResponse;
+  final Map<String, dynamic>? rawResponse;
 
   NetworkManagerException(this.rawResponse);
 

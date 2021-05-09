@@ -1,14 +1,15 @@
 name: nymea_network_manager
 description: Flutter package to interact with nymea network manager in BT BLE
-version: 0.0.1
+version: 0.1.0
 homepage: https://github.com/mylisabox/nymea_network_manager
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
-  flutter: ">=1.17.0 <2.0.0"
+  sdk: '>=2.12.0 <3.0.0'
+  flutter: ">=1.17.0"
 
 dependencies:
-  flutter_blue: ">=0.7.2 <1.0.0"
+  flutter_blue: ">=0.8.0 <1.0.0"
+  collection: ">=1.15.0 <2.0.0"
   flutter:
     sdk: flutter
 
